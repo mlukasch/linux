@@ -9,6 +9,7 @@
 
 #include <linux/clk.h>
 #include <linux/component.h>
+#include <linux/debugfs.h>
 #include <linux/device.h>
 #include <linux/io.h>
 #include <linux/module.h>
@@ -41,6 +42,18 @@ void __iomem *vc4_ioremap_regs(struct platform_device *dev, int index)
 	}
 
 	return map;
+}
+
+void vc4_dump_regs32(const struct debugfs_reg32 *regs, unsigned int num_regs,
+		     void __iomem *base, const char *prefix)
+{
+	unsigned int i;
+
+	for (i = 0; i < num_regs; i++) {
+		DRM_INFO("%s0x%04lx (%s): 0x%08x\n",
+			 prefix, regs[i].offset, regs[i].name,
+			 readl(base + regs[i].offset));
+	}
 }
 
 static void vc4_lastclose(struct drm_device *dev)
