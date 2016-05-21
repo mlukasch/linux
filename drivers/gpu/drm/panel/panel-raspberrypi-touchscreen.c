@@ -281,6 +281,14 @@ static int rpi_touchscreen_write(struct rpi_touchscreen *ts, u16 reg, u32 val)
 
 	mipi_dsi_dcs_write_buffer(ts->dsi, msg, sizeof(msg));
 
+	mipi_dsi_generic_read(ts->dsi, msg, 2, &msg[2], 4);
+
+	dev_info(ts->base.dev, "R 0x%04x -> 0x%08x\n", reg,
+		 msg[0] |
+		 (msg[1] << 8) |
+		 (msg[2] << 16) |
+		 (msg[3] << 24));
+
 	return 0;
 }
 
