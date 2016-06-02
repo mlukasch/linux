@@ -266,8 +266,43 @@ static void rpi_touchscreen_i2c_write(struct rpi_touchscreen *ts, u8 reg, u8 val
 		dev_err(&ts->dsi->dev, "I2C write failed: %d\n", ret);
 }
 
+static int rpi_touchscreen_i2c_tc358762_addr(struct rpi_touchscreen *ts, u16 reg)
+{
+	int ret;
+
+	ret = i2c_smbus_write_byte_data(ts->bridge_i2c, REG_WR_ADDRH,
+					reg >> 8);
+	if (ret) {
+		dev_err(&ts->dsi->dev, "I2C WR_ADDRH failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = i2c_smbus_write_byte_data(ts->bridge_i2c, REG_WR_ADDRL,
+					reg & 0xff);
+	if (ret) {
+		dev_err(&ts->dsi->dev, "I2C WR_ADDRL failed: %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static void
+debug_i2c_read(struct rpi_touchscreen *ts, u16 reg)
+{
+	u32 val;
+
+	rpi_touchscreen_i2c_tc358762_addr(ts, reg);
+
+	val = ((i2c_smbus_read_byte_data(ts->bridge_i2c, REG_READH) << 8) |
+	       i2c_smbus_read_byte_data(ts->bridge_i2c, REG_READL));
+
+	dev_info(&ts->dsi->dev, "R 0x%04x -> 0x%08x", reg, val);
+}
+
 static int rpi_touchscreen_write(struct rpi_touchscreen *ts, u16 reg, u32 val)
 {
+	/*
 	u8 msg[] = {
 		reg,
 		reg >> 8,
@@ -276,8 +311,6 @@ static int rpi_touchscreen_write(struct rpi_touchscreen *ts, u16 reg, u32 val)
 		val >> 16,
 		val >> 24,
 	};
-
-	dev_info(ts->base.dev, "W 0x%04x -> 0x%08x\n", reg, val);
 
 	mipi_dsi_dcs_write_buffer(ts->dsi, msg, sizeof(msg));
 
@@ -288,6 +321,30 @@ static int rpi_touchscreen_write(struct rpi_touchscreen *ts, u16 reg, u32 val)
 		 (msg[1] << 8) |
 		 (msg[2] << 16) |
 		 (msg[3] << 24));
+
+	debug_i2c_read(ts, reg, val);
+	*/
+	int ret;
+
+	debug_i2c_read(ts, reg);
+
+	dev_info(ts->base.dev, "W 0x%04x -> 0x%08x\n", reg, val);
+	rpi_touchscreen_i2c_tc358762_addr(ts, reg);
+
+	ret = i2c_smbus_write_byte_data(ts->bridge_i2c, val & 0xff, REG_WRITEL);
+	if (ret) {
+		dev_err(&ts->dsi->dev, "I2C WRITEL failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = i2c_smbus_write_byte_data(ts->bridge_i2c, val >> 8, REG_WRITEH);
+	if (ret) {
+		dev_err(&ts->dsi->dev, "I2C WRITEH failed: %d\n", ret);
+		return ret;
+	}
+
+	debug_i2c_read(ts, reg);
+	dev_info(ts->base.dev, "write done\n");
 
 	return 0;
 }
